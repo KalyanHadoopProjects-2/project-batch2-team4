@@ -1,0 +1,26 @@
+
+
+create database kalyan;
+
+add jar /usr/lib/hive-hcatalog/share/hcatalog/hive-hcatalog-core.jar;
+
+create table if not exists kalyan.employee1_json(empid int,name string,salary string,dept string)
+row format serde 'org.apache.hive.hcatalog.data.JsonSerDe' stored as textfile;
+
+load data local inpath '/home/orienit/datasets/employee1.json' into table kalyan.employee1_json;
+
+create table employee1_op as select * from employee1_json where empid>2 and dept='dev';
+
+
+
+
+create table employee1_xml(xml string);
+
+load data local inpath '/home/orienit/datasets/employee1.xml' into table employee1_xml;
+
+select xpath(xml, '/employee/name/text()') from employee1_xml;
+
+select xpath(xml, '/employee/empid/text()'), xpath(xml, '/employee/name/text()'),
+ xpath(xml, '/employee/salary/text()'), xpath(xml, '/employee/dept/text()') from employee1_xml;
+ 
+ 
