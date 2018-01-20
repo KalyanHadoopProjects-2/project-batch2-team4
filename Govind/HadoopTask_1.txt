@@ -1,0 +1,155 @@
+package com.orienit.hadoop.training;
+
+import java.io.IOException;
+
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+
+public class MultipleOutputsMapper extends
+		Mapper<LongWritable, Text, Text, Text> {
+	@Override
+	protected void map(LongWritable key, Text value, Context context)
+			throws IOException, InterruptedException {
+
+		// 1.read the line
+		String line = value.toString();
+
+		// 2.split the line into fields
+		String[] words = line.split("|");
+		
+		String dt = words[0].toString();
+		String ip = words[1].toString();
+		String country = words[2].toString();
+		String status = words[3].toString();
+		
+		StringBuilder mapoutputkey = new StringBuilder();
+		mapoutputkey.append(country);
+		mapoutputkey.append("/");
+		mapoutputkey.append(status);
+		
+		String mapoutputvalue = dt + "|" + ip;
+
+		context.write(new Text(mapoutputkey.toString()), new Text(mapoutputvalue));
+
+	}
+}
+
+
+package com.orienit.hadoop.training;
+
+import java.io.IOException;
+
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Reducer;
+import org.apache.hadoop.mapreduce.lib.output.MultipleOutputs;
+
+public class MultipleOutputsReducer extends Reducer<Text, Text, NullWritable, Text> {
+
+	private MultipleOutputs<NullWritable,Text> multipleOutputs;
+
+	@Override
+	public void setup(Context context) throws IOException, InterruptedException
+	{
+		multipleOutputs = new MultipleOutputs<NullWritable, Text>(context);
+	}
+
+	@Override
+	public void reduce(Text rkey, Iterable<Text> rvalue, Context context) throws IOException, InterruptedException
+	{							
+		for(Text value : rvalue)
+		{
+			multipleOutputs.write(NullWritable.get(), value, rkey.toString());
+		}
+	}
+
+	@Override
+	protected void cleanup(Context context) throws IOException, InterruptedException {
+		multipleOutputs.close();
+	}
+}
+
+
+package com.orienit.hadoop.training;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.NullWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+
+public class MultipleOutputsJob implements Tool {
+	// Initializing configuration object
+	private Configuration conf;
+
+	@Override
+	public Configuration getConf() {
+		return conf; // getting the configuration
+	}
+
+	@Override
+	public void setConf(Configuration conf) {
+		this.conf = conf; // setting the configuration
+	}
+
+	@Override
+	public int run(String[] args) throws Exception {
+
+		// initializing the job configuration
+		Job multipleOutputsjob = new Job(getConf());
+
+		// setting the job name
+		multipleOutputsjob.setJobName("multiple Outputs Job");
+
+		// to call this as a jar
+		multipleOutputsjob.setJarByClass(this.getClass());
+
+		// setting custom mapper class
+		multipleOutputsjob.setMapperClass(MultipleOutputsMapper.class);
+
+		// setting custom reducer class
+		multipleOutputsjob.setReducerClass(MultipleOutputsReducer.class);
+
+		// setting mapper output key class: K2
+		multipleOutputsjob.setMapOutputKeyClass(Text.class);
+
+		// setting mapper output value class: V2
+		multipleOutputsjob.setMapOutputValueClass(Text.class);
+
+		// setting reducer output key class: K3
+		multipleOutputsjob.setOutputKeyClass(NullWritable.class);
+
+		// setting reducer output value class: V3
+		multipleOutputsjob.setOutputValueClass(Text.class);
+
+		// setting the input format class ,i.e for K1, V1
+		multipleOutputsjob.setInputFormatClass(TextInputFormat.class);
+		
+		// setting the input file path
+		FileInputFormat.addInputPath(multipleOutputsjob, new Path(args[0]));
+
+		// setting the output folder path
+		FileOutputFormat.setOutputPath(multipleOutputsjob, new Path(args[1]));
+
+		Path outputpath = new Path(args[1]);
+		// delete the output folder if exists
+		outputpath.getFileSystem(conf).delete(outputpath, true);
+
+		// to execute the job and return the status
+		return multipleOutputsjob.waitForCompletion(true) ? 0 : -1;
+
+	}
+
+	public static void main(String[] args) throws Exception {
+		// start the job providing arguments and configurations
+		int status = ToolRunner.run(new Configuration(), new MultipleOutputsJob(), args);
+		System.out.println("My Status: " + status);
+	}
+
+}

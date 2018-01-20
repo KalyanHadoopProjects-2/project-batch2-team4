@@ -1,0 +1,121 @@
+package com.orienit.hadoop.training;
+
+import java.io.IOException;
+
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Mapper;
+
+public class CountrySuccessCountMapper extends
+		Mapper<LongWritable, Text, Text, LongWritable> {
+	@Override
+	protected void map(LongWritable key, Text value, Context context)
+			throws IOException, InterruptedException {
+
+		// 1.read the line
+		String line = value.toString();
+
+		// 2.split the line into fields
+		String[] words = line.split("|");
+		
+		String dt = words[0].toString();
+		String ip = words[1].toString();
+		String country = words[2].toString();
+		String status = words[3].toString();
+		
+		if(status == "SUCCESS")
+		{
+			context.write(new Text(country), new LongWritable(1));
+		}	
+	}
+}
+
+package com.orienit.hadoop.training;
+
+import java.io.IOException;
+
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Reducer;
+
+public class CountrySuccessCountReducer extends Reducer<Text, LongWritable, Text, LongWritable> {
+
+	protected void reduce(Text key, Iterable<LongWritable> values, Context context) throws IOException,
+			InterruptedException {
+		long sum = 0;
+		
+		// sum the list of values
+		for(LongWritable value : values)
+		{
+			sum = sum + value.get();
+		}
+        
+		// assign the sum to corresponding word or key
+		context.write(key, new LongWritable(sum));
+	};
+}
+
+
+package com.orienit.hadoop.training;
+
+import org.apache.hadoop.conf.Configuration;
+import org.apache.hadoop.fs.Path;
+import org.apache.hadoop.io.LongWritable;
+import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapreduce.Job;
+import org.apache.hadoop.mapreduce.lib.input.FileInputFormat;
+import org.apache.hadoop.mapreduce.lib.input.TextInputFormat;
+import org.apache.hadoop.mapreduce.lib.output.FileOutputFormat;
+import org.apache.hadoop.mapreduce.lib.output.TextOutputFormat;
+import org.apache.hadoop.util.Tool;
+import org.apache.hadoop.util.ToolRunner;
+
+public class CountrySuccessCountJob implements Tool {
+
+	private Configuration conf;
+
+	@Override
+	public Configuration getConf() {
+		return conf;
+	}
+
+	@Override
+	public void setConf(Configuration conf) {
+		this.conf = conf;
+	}
+
+	@Override
+	public int run(String[] args) throws Exception {
+        //initialize the Job object with configuration
+		Job countryCountJob = new Job(getConf());
+		countryCountJob.setJobName("country Count Job");
+		countryCountJob.setJarByClass(this.getClass());
+
+		//Providing the mapper and reducer class names
+		countryCountJob.setMapperClass(CountrySuccessCountMapper.class);
+		countryCountJob.setReducerClass(CountrySuccessCountReducer.class);
+		
+		//the hdfs input and output directory to be fetched from the command line
+		FileInputFormat.setInputPaths(countryCountJob, new Path(args[0]));
+		FileOutputFormat.setOutputPath(countryCountJob, new Path(args[1]));
+
+		//Setting configuration object with the Data Type of output Key and Value		
+		countryCountJob.setMapOutputKeyClass(Text.class);
+		countryCountJob.setMapOutputValueClass(LongWritable.class);
+		countryCountJob.setOutputKeyClass(Text.class);
+		countryCountJob.setOutputValueClass(LongWritable.class);
+		countryCountJob.setInputFormatClass(TextInputFormat.class);
+		countryCountJob.setOutputFormatClass(TextOutputFormat.class);
+		
+		Path outputpath = new Path(args[1]);
+		// delete the output folder if exists
+		outputpath.getFileSystem(conf).delete(outputpath, true);
+
+		return countryCountJob.waitForCompletion(true) == true ? 0 : -1;
+	}
+
+	public static void main(String[] args) throws Exception {
+		ToolRunner.run(new Configuration(), new CountrySuccessCountJob(), args);
+	}
+
+}
