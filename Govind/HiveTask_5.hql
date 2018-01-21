@@ -1,12 +1,13 @@
 USE kalyan;
 
-CREATE TABLE IF NOT EXISTS student_parquet
-( name string, id int , course string, year int )
-ROW FORMAT SERDE 'org.apache.hadoop.hive.ql.io.parquet.serde.ParquetHiveSerDe'
-STORED AS 
-INPUTFORMAT 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetInputFormat'
-OUTPUTFORMAT 'org.apache.hadoop.hive.ql.io.parquet.MapredParquetOutputFormat';
+hdfs dfs -put /home/orienit/input-files/student.parquet /user/orienit/Govind/hive
 
-LOAD DATA LOCAL INPATH '/home/orienit/input-files/student.parquet' OVERWRITE INTO TABLE student_parquet;
+invalidate metadata;
+
+DROP TABLE IF EXISTS student_parquet;
+
+CREATE EXTERNAL TABLE student_parquet LIKE PARQUET '/user/orienit/Govind/hive/student.parquet'
+STORED AS PARQUET
+LOCATION '/user/orienit/Govind/hive';
 
 CREATE TABLE student_parquet_op AS select * from student_parquet where id > 2 and course = 'spark';
